@@ -1,3 +1,14 @@
+---
+title: CodeQuery AI
+emoji: ⚡
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: RAG-powered Q&A over any GitHub codebase
+---
+
 # ⚡ CodeQuery AI — Codebase Q&A Assistant
 
 A RAG-powered application that lets you **ask questions about any codebase in natural language** and get accurate, source-cited answers.
@@ -34,7 +45,7 @@ export GEMINI_API_KEY="your-api-key-here"
 ### 2. Install Dependencies
 
 ```bash
-cd codebase-qa/backend
+cd backend
 pip install -r requirements.txt
 ```
 
@@ -48,7 +59,23 @@ python main.py
 
 ### 4. Open the App
 
-Open [http://localhost:8000](http://localhost:8000) in your browser.
+Open [http://localhost:8080](http://localhost:8080) in your browser.
+
+## ☁️ Deploy to Hugging Face Spaces (free, no card)
+
+1. Create a free account at [huggingface.co](https://huggingface.co/join)
+2. Create a new Space at [huggingface.co/new-space](https://huggingface.co/new-space): name it `codequery-ai`, pick **Docker** → **Blank**, hardware **CPU basic (free)**
+3. In the Space → **Settings** → **Variables and secrets**, add `GROQ_API_KEY` and/or `GEMINI_API_KEY` as **secrets**
+4. Create a **Write** token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+5. Run the deploy script (use your HF username and the token as the password when git asks):
+
+```bash
+./deploy.sh YOUR_HF_USERNAME codequery-ai
+```
+
+The app will be live at `https://YOUR_HF_USERNAME-codequery-ai.hf.space` after the build finishes.
+
+> **Note:** On the deployed app only GitHub URLs can be indexed (local paths are disabled). Free Spaces sleep after 48 hours without visitors and lose indexed repos on restart, so re-index after a wake-up.
 
 ## 📖 Usage
 

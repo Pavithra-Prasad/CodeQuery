@@ -84,6 +84,14 @@ def index_codebase(
     temp_dir = None
     
     try:
+        # On a public deployment, don't let visitors index files on the server
+        allow_local = os.environ.get("ALLOW_LOCAL_PATHS", "true").lower() == "true"
+        if not allow_local and not source.startswith(("https://", "http://")):
+            return {
+                "status": "error",
+                "message": "Local paths are disabled on this server. Please enter a GitHub URL (https://github.com/...).",
+            }
+
         # Determine if it's a GitHub URL or local path
         is_github = "github.com" in source or (
             source.startswith("http") and "git" in source.lower()
