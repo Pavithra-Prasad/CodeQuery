@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuery AI — Codebase Q&A Assistant</title>
+    <meta name="description" content="Ask natural language questions about any codebase. Powered by RAG, Gemini AI, and ChromaDB.">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">⚡</span>
+                    <span class="logo-text">CodeQuery AI</span>
+                </div>
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle sidebar">
+                    <span class="toggle-icon">☰</span>
+                </button>
+            </div>
+
+            <!-- Index New Repo -->
+            <div class="index-section">
+                <h3 class="section-title">Index a Repository</h3>
+                <form id="indexForm" class="index-form">
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            id="sourceInput" 
+                            placeholder="Local path or GitHub URL..." 
+                            required
+                            autocomplete="off"
+                        >
+                        <div class="input-hint">e.g. /Users/you/project or https://github.com/user/repo</div>
+                    </div>
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            id="repoNameInput" 
+                            placeholder="Custom name (optional)"
+                            autocomplete="off"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="indexBtn">
+                        <span class="btn-icon">📥</span>
+                        <span class="btn-text">Index Repository</span>
+                    </button>
+                </form>
+
+                <!-- Indexing Progress -->
+                <div class="progress-container" id="progressContainer" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Starting...</div>
+                </div>
+            </div>
+
+            <!-- Indexed Repos -->
+            <div class="repos-section">
+                <h3 class="section-title">Indexed Repositories</h3>
+                <div class="repos-list" id="reposList">
+                    <div class="empty-state">
+                        <span class="empty-icon">📭</span>
+                        <p>No repositories indexed yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <p>Built with RAG • Gemini AI • ChromaDB</p>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="chat-header">
+                <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Menu">☰</button>
+                <div class="header-info">
+                    <h1 class="header-title">Codebase Q&A</h1>
+                    <div class="active-repo" id="activeRepo">
+                        <span class="repo-badge">No repo selected</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Chat Messages -->
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome-message" id="welcomeMessage">
+                    <div class="welcome-icon">🧠</div>
+                    <h2>Welcome to CodeQuery AI</h2>
+                    <p>Index a codebase, then ask questions about it in natural language.</p>
+                    <div class="welcome-steps">
+                        <div class="step">
+                            <span class="step-num">1</span>
+                            <span>Index a repository using the sidebar</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-num">2</span>
+                            <span>Select the repo from the list</span>
+                        </div>
+                        <div class="step">
+                            <span class="step-num">3</span>
+                            <span>Ask any question about the code</span>
+                        </div>
+                    </div>
+                    <div class="example-questions">
+                        <p class="examples-label">Try asking:</p>
+                        <button class="example-q" onclick="fillQuestion(this)">How does authentication work?</button>
+                        <button class="example-q" onclick="fillQuestion(this)">Explain the database models</button>
+                        <button class="example-q" onclick="fillQuestion(this)">What API endpoints are available?</button>
+                        <button class="example-q" onclick="fillQuestion(this)">How is error handling implemented?</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input -->
+            <div class="chat-input-container">
+                <form id="chatForm" class="chat-form">
+                    <div class="input-wrapper">
+                        <textarea 
+                            id="questionInput" 
+                            placeholder="Ask a question about the codebase..."
+                            rows="1"
+                            required
+                        ></textarea>
+                        <button type="submit" class="send-btn" id="sendBtn" title="Send message">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="input-footer">
+                        <span class="footer-hint">Press Enter to send, Shift+Enter for new line</span>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
