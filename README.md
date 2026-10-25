@@ -4,7 +4,6 @@ A RAG-powered application that lets you **ask questions about any codebase in na
 
 ![Built with](https://img.shields.io/badge/Built%20with-RAG-7c5cfc)
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 🏗️ Architecture
 
@@ -100,6 +99,3 @@ codebase-qa/
 | GET | `/api/index-status/{name}` | Check indexing progress |
 | DELETE | `/api/repos/{name}` | Delete an indexed repository |
 
-## 📄 License
-
-MIT License — free to use, modify, and distribute.
