@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from indexer import index_codebase, extract_repo_name
 from rag_engine import ask_question
@@ -34,7 +34,7 @@ class IndexRequest(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     repo_name: str
-    top_k: int = 5
+    top_k: int = Field(5, ge=1, le=50)  # Number of code chunks to retrieve
 
 
 class IndexResponse(BaseModel):

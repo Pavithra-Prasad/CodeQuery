@@ -4,6 +4,8 @@ Stores code chunk embeddings locally on disk for persistent storage.
 """
 
 import os
+from typing import Optional
+
 import chromadb
 from chromadb.config import Settings
 
@@ -45,24 +47,32 @@ def get_or_create_collection(repo_name: str) -> chromadb.Collection:
     )
 
 
+def get_existing_collection(repo_name: str) -> Optional[chromadb.Collection]:
+    """Get a repository's collection, or None if it was never indexed (without creating it)."""
+    try:
+        return get_client().get_collection(name=sanitize_collection_name(repo_name))
+    except Exception:
+        return None  # Collection doesn't exist
+
+
 def sanitize_collection_name(name: str) -> str:
     """
     Sanitize a repository name to be a valid ChromaDB collection name.
     Rules: 3-63 chars, alphanumeric + underscores/hyphens, starts/ends with alphanumeric.
+    Valid names are kept as they are. Other names get a short hash of the original, so names
+    that clean up to the same text (e.g. "my.repo" and "my_repo") don't share a collection.
     """
+    import hashlib
     import re
+    if re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]{1,61}[a-zA-Z0-9]", name):
+        return name
     # Replace non-alphanumeric chars with underscores
     safe = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
     # Ensure it starts and ends with alphanumeric
-    safe = safe.strip("_-")
-    if not safe:
-        safe = "default_repo"
-    # Ensure min length 3
-    while len(safe) < 3:
-        safe += "_x"
-    # Truncate to max 63
-    safe = safe[:63].rstrip("_-")
-    return safe
+    safe = safe.strip("_-") or "repo"
+    # Leave room for the hash: 54 + "_" + 8 = 63 chars max
+    safe = safe[:54].rstrip("_-")
+    return f"{safe}_{hashlib.sha1(name.encode()).hexdigest()[:8]}"
 
 
 def add_documents(
@@ -112,11 +122,15 @@ def query_documents(
     Returns:
         Dict with keys: 'ids', 'documents', 'metadatas', 'distances'
     """
-    collection = get_or_create_collection(repo_name)
-    
+    # An unknown or empty repo has nothing to search (ChromaDB rejects n_results=0)
+    collection = get_existing_collection(repo_name)
+    count = collection.count() if collection else 0
+    if count == 0:
+        return {"ids": [], "documents": [], "metadatas": [], "distances": []}
+
     results = collection.query(
         query_embeddings=[query_embedding],
-        n_results=min(top_k, collection.count()),
+        n_results=min(top_k, count),
     )
     
     return {
@@ -147,7 +161,7 @@ def list_collections() -> list[str]:
 def get_collection_count(repo_name: str) -> int:
     """Get the number of chunks indexed for a repository."""
     try:
-        collection = get_or_create_collection(repo_name)
-        return collection.count()
+        collection = get_existing_collection(repo_name)
+        return collection.count() if collection else 0
     except Exception:
         return 0

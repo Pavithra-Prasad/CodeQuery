@@ -62,7 +62,9 @@ def format_sources(results: dict) -> list[dict]:
                 "start_line": meta.get("start_line", 0),
                 "end_line": meta.get("end_line", 0),
                 "snippet": doc[:200] + "..." if len(doc) > 200 else doc,
-                "relevance": round(1 - distance, 3) if distance < 1 else round(distance, 3),
+                # ChromaDB's default distance is squared L2 (0-4). For the unit-length MiniLM
+                # embeddings that equals 2 - 2*cosine, so cosine similarity = 1 - distance / 2.
+                "relevance": round(max(0.0, 1 - distance / 2), 3),
             })
     
     return sources

@@ -173,7 +173,7 @@ def _find_boundaries(lines: list[str], language: str) -> list[int]:
         "python": r"^(class |def |async def )",
         "javascript": r"^(function |class |const \w+ = (\(|async)|export (default )?(function|class|const))",
         "typescript": r"^(function |class |const \w+ = (\(|async)|export (default )?(function|class|const)|interface |type )",
-        "java": r"^(\s*(public|private|protected|static)?\s*(class |interface |void |int |String |boolean |double |float |long ))",
+        "java": r"^(((public|private|protected|static|final|abstract|synchronized)\s+)*(class |interface |enum |void |int |String |boolean |double |float |long ))",
         "go": r"^(func |type )",
         "rust": r"^(fn |pub fn |struct |impl |enum |trait )",
         "cpp": r"^(\w+\s+\w+\s*\(|class |struct |namespace )",
@@ -300,7 +300,8 @@ def walk_codebase(root_path: str) -> list[str]:
         for filename in filenames:
             file_path = os.path.join(dirpath, filename)
             
-            if should_skip_path(file_path):
+            # Check the path inside the repo only, so a parent folder like build/ doesn't skip everything
+            if should_skip_path(os.path.relpath(file_path, root_path)):
                 continue
             
             if get_language(file_path) is None:

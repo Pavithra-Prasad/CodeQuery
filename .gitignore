@@ -9,3 +9,8 @@ dist/
 build/
 .idea/
 .vscode/
+
+# Test output
+.pytest_cache/
+.coverage
+htmlcov/
