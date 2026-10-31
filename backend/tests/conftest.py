@@ -4,7 +4,8 @@ Shared test fixtures.
 Every test runs offline and leaves no trace:
 - the ChromaDB client points at a fresh temporary folder (never backend/chroma_data),
 - embeddings come from a small deterministic fake (no model download),
-- the Groq and Gemini API keys are removed, so nothing calls a real LLM.
+- the Groq and Gemini API keys are removed and the Ollama startup check is skipped,
+  so nothing calls a real LLM (tests that need one pass in a fake).
 """
 
 import os
@@ -17,10 +18,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 import indexer
+import llm
 import main
 import rag_engine
 import vector_store
 from fakes import fake_embed
+from tools import repo_tools
 
 
 @pytest.fixture(autouse=True)
@@ -36,8 +39,12 @@ def offline(monkeypatch):
     """No real embedding model and no real LLM keys."""
     monkeypatch.setattr(indexer, "embed_texts", lambda texts: [fake_embed(t) for t in texts])
     monkeypatch.setattr(rag_engine, "embed_query", fake_embed)
+    monkeypatch.setattr(repo_tools, "embed_query", fake_embed)
+    monkeypatch.setattr(llm, "check_ollama", lambda *a, **k: None)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    for name in ("LLM_PROVIDER", "LLM_MODEL", "JUDGE_MODEL", "AGENT_MAX_ITERATIONS", "OLLAMA_HOST"):
+        monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("ALLOW_LOCAL_PATHS", "true")
     main.indexing_status.clear()
     yield

@@ -137,6 +137,14 @@
                         </button>
                     </div>
                     <div class="input-footer">
+                        <div class="mode-toggle" role="radiogroup" aria-label="Answer mode">
+                            <label title="One search, one answer (faster)">
+                                <input type="radio" name="mode" value="rag" checked> RAG
+                            </label>
+                            <label title="The model searches and reads files with tools before answering (slower, shows its steps)">
+                                <input type="radio" name="mode" value="agent"> Agent
+                            </label>
+                        </div>
                         <span class="footer-hint">Press Enter to send, Shift+Enter for new line</span>
                     </div>
                 </form>

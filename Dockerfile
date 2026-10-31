@@ -16,7 +16,8 @@ ENV HOME=/home/user \
     PORT=7860 \
     HF_HOME=/home/user/.cache/huggingface \
     ANONYMIZED_TELEMETRY=False \
-    ALLOW_LOCAL_PATHS=false
+    ALLOW_LOCAL_PATHS=false \
+    LLM_PROVIDER=cloud
 
 WORKDIR $HOME/app
 

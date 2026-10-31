@@ -10,8 +10,8 @@ import chromadb
 from chromadb.config import Settings
 
 
-# Persistent storage directory
-CHROMA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_data")
+# Persistent storage directory (CHROMA_DIR overrides it, e.g. so the eval keeps its own index)
+CHROMA_DIR = os.environ.get("CHROMA_DIR") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_data")
 
 # Singleton client
 _client = None
@@ -165,3 +165,24 @@ def get_collection_count(repo_name: str) -> int:
         return collection.count() if collection else 0
     except Exception:
         return 0
+
+
+def get_chunks(repo_name: str, file_path: Optional[str] = None) -> list[dict]:
+    """
+    Get stored chunks (without embeddings), optionally only those of one file.
+
+    Returns:
+        List of dicts with keys 'id', 'document', 'metadata', sorted by file path and start line
+    """
+    collection = get_existing_collection(repo_name)
+    if collection is None:
+        return []
+
+    where = {"file_path": file_path} if file_path else None
+    results = collection.get(where=where, include=["documents", "metadatas"])
+    chunks = [
+        {"id": id_, "document": doc, "metadata": meta or {}}
+        for id_, doc, meta in zip(results["ids"], results["documents"], results["metadatas"])
+    ]
+    chunks.sort(key=lambda c: (c["metadata"].get("file_path", ""), c["metadata"].get("start_line", 0)))
+    return chunks

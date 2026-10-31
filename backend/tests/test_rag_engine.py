@@ -1,4 +1,4 @@
-"""Tests for the RAG engine: prompt context, source formatting and the Groq -> Gemini failover."""
+"""Tests for the RAG engine: prompt context, source formatting, the Ollama default and the Groq -> Gemini failover."""
 
 import asyncio
 import sys
@@ -48,7 +48,7 @@ def test_relevance_drops_as_distance_grows():
     assert close["relevance"] > far["relevance"] > opposite["relevance"] == 0
 
 
-# ── LLM failover ────────────────────────────────────────────────
+# ── Cloud LLM failover (LLM_PROVIDER=cloud) ─────────────────────
 
 @pytest.fixture
 def providers(monkeypatch):
@@ -77,7 +77,7 @@ def test_groq_is_used_first(providers, monkeypatch):
     calls, _ = providers
     monkeypatch.setenv("GROQ_API_KEY", "test")
     monkeypatch.setenv("GEMINI_API_KEY", "test")
-    assert rag_engine._call_llm("q") == "answer from groq"
+    assert rag_engine._call_cloud_llm("q") == "answer from groq"
     assert calls == ["groq"]
 
 
@@ -86,14 +86,14 @@ def test_falls_back_to_gemini_when_groq_fails(providers, monkeypatch):
     state["groq_fails"] = True
     monkeypatch.setenv("GROQ_API_KEY", "test")
     monkeypatch.setenv("GEMINI_API_KEY", "test")
-    assert rag_engine._call_llm("q") == "answer from gemini"
+    assert rag_engine._call_cloud_llm("q") == "answer from gemini"
     assert calls == ["groq", "gemini"]
 
 
 def test_uses_gemini_directly_when_only_its_key_is_set(providers, monkeypatch):
     calls, _ = providers
     monkeypatch.setenv("GEMINI_API_KEY", "test")
-    assert rag_engine._call_llm("q") == "answer from gemini"
+    assert rag_engine._call_cloud_llm("q") == "answer from gemini"
     assert calls == ["gemini"]
 
 
@@ -103,7 +103,7 @@ def test_error_names_both_providers_when_both_fail(providers, monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test")
     monkeypatch.setenv("GEMINI_API_KEY", "test")
     with pytest.raises(Exception, match="All LLM providers failed") as err:
-        rag_engine._call_llm("q")
+        rag_engine._call_cloud_llm("q")
     assert "Groq: rate limited" in str(err.value)
     assert "Gemini: quota exceeded" in str(err.value)
 
@@ -113,14 +113,14 @@ def test_error_when_groq_fails_and_there_is_no_gemini_key(providers, monkeypatch
     state["groq_fails"] = True
     monkeypatch.setenv("GROQ_API_KEY", "test")
     with pytest.raises(Exception, match="Groq: rate limited"):
-        rag_engine._call_llm("q")
+        rag_engine._call_cloud_llm("q")
     assert calls == ["groq"]
 
 
 def test_clear_message_when_no_api_key_is_set(providers):
     calls, _ = providers
     with pytest.raises(ValueError, match="No API key set"):
-        rag_engine._call_llm("q")
+        rag_engine._call_cloud_llm("q")
     assert calls == []
 
 
@@ -208,3 +208,39 @@ def test_ask_question_on_an_empty_index_gives_a_friendly_message(monkeypatch):
     out = asyncio.run(rag_engine.ask_question("anything?", "empty-repo"))
     assert "couldn't find any relevant code" in out["answer"]
     assert out["sources"] == []
+
+
+# ── Provider choice: Ollama by default, cloud on request ────────
+
+def test_ollama_is_the_default_provider(monkeypatch):
+    monkeypatch.setattr(rag_engine, "_call_ollama", lambda p: "local answer")
+    monkeypatch.setattr(rag_engine, "_call_cloud_llm", lambda p: pytest.fail("cloud should not be called"))
+    assert rag_engine._call_llm("q") == "local answer"
+
+
+def test_cloud_provider_uses_the_groq_gemini_chain(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "cloud")
+    monkeypatch.setattr(rag_engine, "_call_ollama", lambda p: pytest.fail("ollama should not be called"))
+    monkeypatch.setattr(rag_engine, "_call_cloud_llm", lambda p: "cloud answer")
+    assert rag_engine._call_llm("q") == "cloud answer"
+
+
+def test_call_ollama_sends_the_system_prompt_and_question(monkeypatch):
+    sent = {}
+
+    def fake_chat(messages, **kwargs):
+        sent["messages"] = messages
+        return types.SimpleNamespace(message=types.SimpleNamespace(content="ollama says hi"))
+
+    monkeypatch.setattr(rag_engine.llm, "chat", fake_chat)
+    assert rag_engine._call_ollama("What does login do?") == "ollama says hi"
+    assert sent["messages"] == [{"role": "system", "content": rag_engine.SYSTEM_PROMPT},
+                                {"role": "user", "content": "What does login do?"}]
+
+
+def test_ask_question_can_return_the_context_it_used(monkeypatch):
+    index("shop", {"auth.py": "def login(password): check password hash"})
+    monkeypatch.setattr(rag_engine, "_call_llm", lambda p: "answer")
+    out = asyncio.run(rag_engine.ask_question("login?", "shop", top_k=1, include_context=True))
+    assert "def login(password)" in out["context"]
+    assert "context" not in asyncio.run(rag_engine.ask_question("login?", "shop", top_k=1))

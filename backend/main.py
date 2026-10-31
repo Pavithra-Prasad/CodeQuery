@@ -11,7 +11,7 @@ load_dotenv()
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +19,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
+import llm
+from agent import run_agent
+from config import get_settings
 from indexer import index_codebase, extract_repo_name
 from rag_engine import ask_question
 from vector_store import list_collections, get_collection_count, delete_collection
@@ -35,6 +38,7 @@ class QueryRequest(BaseModel):
     question: str
     repo_name: str
     top_k: int = Field(5, ge=1, le=50)  # Number of code chunks to retrieve
+    mode: Literal["rag", "agent"] = "rag"  # rag: one retrieval + one LLM call; agent: tool-calling loop
 
 
 class IndexResponse(BaseModel):
@@ -48,6 +52,10 @@ class IndexResponse(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     sources: list[dict] = []
+    mode: str = "rag"
+    trace: list[dict] = []  # agent mode: every tool call with its arguments, result size and latency
+    iterations: int = 0
+    tool_calls: int = 0
 
 
 class RepoInfo(BaseModel):
@@ -68,6 +76,14 @@ async def lifespan(app: FastAPI):
     print("🚀 Codebase Q&A Assistant starting up...")
     port = os.environ.get('PORT', '8080')
     print(f"   Open http://localhost:{port} in your browser")
+    settings = get_settings()
+    try:
+        llm.check_ollama()
+        print(f"✅ Ollama is ready ({settings.llm_model})")
+    except llm.OllamaNotReady as e:
+        # Keep serving (the UI and cloud mode still work); questions will return this message
+        needed = "Agent mode needs" if settings.llm_provider == "cloud" else "Answers need"
+        print(f"⚠️  {needed} Ollama: {e}")
     yield
     print("👋 Shutting down...")
 
@@ -145,12 +161,19 @@ async def api_query(request: QueryRequest):
         raise HTTPException(status_code=400, detail="Repository name is required")
     
     try:
+        if request.mode == "agent":
+            # The agent makes several blocking LLM calls; run it in a thread to keep the server responsive
+            result = await asyncio.to_thread(run_agent, request.question, request.repo_name)
+            return QueryResponse(mode="agent", **{k: v for k, v in result.to_dict().items()
+                                                  if k in ("answer", "sources", "trace", "iterations", "tool_calls")})
         result = await ask_question(
             question=request.question,
             repo_name=request.repo_name,
             top_k=request.top_k,
         )
         return QueryResponse(**result)
+    except llm.OllamaNotReady as e:
+        raise HTTPException(status_code=503, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

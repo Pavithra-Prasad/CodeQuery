@@ -1,10 +1,15 @@
 """
 RAG Engine — the core of the Q&A system.
 Orchestrates: embed query → retrieve chunks → build prompt → call LLM → return answer.
-Supports Groq (free, fast) and Gemini (free tier) as LLM providers.
+Uses a local Ollama model by default (free, no API key). Set LLM_PROVIDER=cloud to use
+Groq (free tier) with Gemini (free tier) as the fallback instead.
 """
 
+import asyncio
 import os
+
+import llm
+from config import get_settings
 from embeddings import embed_query
 from vector_store import query_documents
 
@@ -108,8 +113,25 @@ def _call_gemini(user_prompt: str) -> str:
     return response.text
 
 
+def _call_ollama(user_prompt: str) -> str:
+    """Call the local Ollama model (free, runs on your machine)."""
+    print(f"🤖 Using Ollama ({get_settings().llm_model})...")
+    response = llm.chat([
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ])
+    return response.message.content
+
+
 def _call_llm(user_prompt: str) -> str:
-    """Try available LLM providers in order: Groq → Gemini."""
+    """Send the prompt to the configured provider: local Ollama (default) or the cloud chain."""
+    if get_settings().llm_provider == "cloud":
+        return _call_cloud_llm(user_prompt)
+    return _call_ollama(user_prompt)
+
+
+def _call_cloud_llm(user_prompt: str) -> str:
+    """Try available cloud LLM providers in order: Groq → Gemini."""
     errors = []
     
     # Try Groq first (free, fast, generous limits)
@@ -144,9 +166,10 @@ def _call_llm(user_prompt: str) -> str:
     )
 
 
-async def ask_question(question: str, repo_name: str, top_k: int = 5) -> dict:
+async def ask_question(question: str, repo_name: str, top_k: int = 5, include_context: bool = False) -> dict:
     """
     Full RAG pipeline: embed query → retrieve → generate answer.
+    With include_context=True the result also has "context": the code chunks the LLM saw.
     """
     # Step 1: Embed the query
     query_embedding = embed_query(question)
@@ -172,13 +195,16 @@ async def ask_question(question: str, repo_name: str, top_k: int = 5) -> dict:
 
 Please answer the question based on the code context above. Cite specific files and line numbers."""
     
-    # Step 4: Call LLM (tries Groq first, then Gemini)
-    answer = _call_llm(user_prompt)
-    
+    # Step 4: Call LLM (Ollama, or Groq then Gemini) in a thread so a slow local model doesn't block the server
+    answer = await asyncio.to_thread(_call_llm, user_prompt)
+
     # Step 5: Format and return
     sources = format_sources(results)
-    
-    return {
+
+    result = {
         "answer": answer,
         "sources": sources,
     }
+    if include_context:
+        result["context"] = context
+    return result

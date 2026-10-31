@@ -854,7 +854,67 @@ body {
 
 .input-footer {
     padding-top: 6px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.mode-toggle {
+    display: inline-flex;
+    padding: 2px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+}
+
+.mode-toggle label {
+    padding: 3px 12px;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.mode-toggle input {
+    display: none;
+}
+
+.mode-toggle label:has(input:checked) {
+    background: var(--accent-primary);
+    color: #fff;
+}
+
+.trace-list {
+    display: none;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+}
+
+.trace-list.expanded {
+    display: flex;
+}
+
+.trace-step {
+    padding: 6px 10px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.trace-step .trace-meta {
+    color: var(--text-muted);
+}
+
+.trace-step.trace-error {
+    border-color: var(--red-bg);
+    color: var(--red);
 }
 
 .footer-hint {

@@ -14,3 +14,6 @@ build/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Eval index (rebuilt by eval/run_eval.py)
+eval/.chroma/

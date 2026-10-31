@@ -268,6 +268,7 @@ async function handleAskQuestion(e) {
                 question,
                 repo_name: activeRepo,
                 top_k: 5,
+                mode: getMode(),
             }),
         });
 
@@ -277,7 +278,7 @@ async function handleAskQuestion(e) {
         thinkingEl.remove();
 
         if (res.ok) {
-            addMessage('assistant', result.answer, result.sources);
+            addMessage('assistant', result.answer, result.sources, false, result.trace);
         } else {
             const msg = result.detail || 'Failed to get an answer';
             addMessage('assistant', `⚠️ Error: ${msg}`, [], true);
@@ -292,8 +293,43 @@ async function handleAskQuestion(e) {
     }
 }
 
+// ── Answer Mode ──────────────────────────────────────────────
+function getMode() {
+    const checked = document.querySelector('input[name="mode"]:checked');
+    return checked ? checked.value : 'rag';
+}
+
+// The agent's steps: which tool it called, with what, and how long it took
+function renderTrace(trace) {
+    if (!trace || trace.length === 0) return '';
+    const toolSteps = trace.filter(s => s.kind === 'tool_call' || s.kind === 'tool_error').length;
+    const steps = trace.map(s => {
+        const model = s.model_ms ? ` · model ${(s.model_ms / 1000).toFixed(1)}s` : '';
+        if (s.kind === 'answer') {
+            return `<div class="trace-step">round ${s.iteration}: ✅ answer <span class="trace-meta">${model}</span></div>`;
+        }
+        if (s.kind === 'model_error') {
+            return `<div class="trace-step trace-error">round ${s.iteration}: ⚠️ ${escapeHtml(s.error || 'model error')}</div>`;
+        }
+        const result = s.error ? `⚠️ ${escapeHtml(s.error)}` : `${s.result_chars.toLocaleString()} chars`;
+        return `
+            <div class="trace-step ${s.error ? 'trace-error' : ''}">
+                round ${s.iteration}: 🔧 ${escapeHtml(s.tool)}(${escapeHtml(JSON.stringify(s.arguments))})
+                <span class="trace-meta">→ ${result} · tool ${Math.round(s.latency_ms)}ms${model}</span>
+            </div>`;
+    }).join('');
+    return `
+        <div class="sources-container">
+            <button class="sources-toggle" onclick="this.nextElementSibling.classList.toggle('expanded')">
+                🧠 Agent trace: ${toolSteps} tool call${toolSteps === 1 ? '' : 's'} ▾
+            </button>
+            <div class="trace-list">${steps}</div>
+        </div>
+    `;
+}
+
 // ── Render Messages ──────────────────────────────────────────
-function addMessage(role, content, sources = [], isError = false) {
+function addMessage(role, content, sources = [], isError = false, trace = []) {
     const msgEl = document.createElement('div');
     msgEl.className = `message ${role}`;
 
@@ -326,6 +362,7 @@ function addMessage(role, content, sources = [], isError = false) {
                 ${role === 'assistant' ? renderMarkdown(content) : `<p>${escapeHtml(content)}</p>`}
             </div>
             ${sourcesHtml}
+            ${renderTrace(trace)}
         </div>
     `;
 
